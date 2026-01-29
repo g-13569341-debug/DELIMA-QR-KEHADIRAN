@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Semakan ID Delima & QR Kehadiran - SK KULAMBAI</title>
+    <!-- Scripts & Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .theme-blue { color: #2c5aa0; }
+        .bg-theme-blue { background-color: #2c5aa0; }
+        .bg-theme-dark { background-color: #1a3a6e; }
+        
+        /* SLIP DIMENSIONS: 60mm x 90mm (300 DPI) */
+        #slip-container {
+            width: 709px; /* 60mm */
+            height: 1063px; /* 90mm */
+            padding: 30px;
+            background: white;
+            border: 10px solid #2c5aa0;
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            box-sizing: border-box;
+        }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            width: 20px; height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm py-10 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <img src="https://i.postimg.cc/sghmP0WJ/logo-sekolah-kebangsaan-kulambai.png" alt="Logo SK Kulambai" class="h-32 mx-auto mb-6 drop-shadow-sm">
+            <h1 class="text-3xl md:text-4xl font-bold theme-blue tracking-tight uppercase">Sekolah Kebangsaan Kulambai</h1>
+            <p class="text-gray-500 mt-2 text-lg">Portal Semakan ID Delima dan QR Kehadiran</p>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-6 md:p-12">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            
+            <!-- Carian Section -->
+            <div class="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                <h2 class="text-xl font-bold mb-6 text-gray-800 border-b pb-4">Carian Maklumat Pelajar</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <!-- FIXED: Added 'for' attribute to match input ID -->
+                        <label for="inputNama" class="block text-sm font-bold text-gray-600 mb-2">Nama Penuh Murid (Berserta Nama Bapa)</label>
+                        <input type="text" 
+                               id="inputNama" 
+                               placeholder="Contoh: Abdul Hamiz Bin Abdul Rahman" 
+                               class="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-lg"
+                               onkeypress="if(event.key === 'Enter') searchStudent()">
+                        <p class="text-xs text-gray-400 mt-3 font-medium italic">*Pastikan ejaan mengikut dokumen pengenalan diri.</p>
+                    </div>
+
+                    <button onclick="searchStudent()" id="btnSemak" 
+                            class="w-full bg-theme-blue hover:bg-blue-800 text-white font-bold py-5 rounded-2xl transition-all shadow-lg hover:shadow-blue-200 flex justify-center items-center gap-3 text-lg">
+                        <span>SEMAK MAKLUMAT</span>
+                    </button>
+                </div>
+                
+                <div id="statusNotif" class="mt-6 p-4 rounded-xl text-center hidden font-semibold"></div>
+            </div>
+
+            <!-- Hasil Section -->
+            <div id="resultArea" class="hidden fade-in bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-theme-dark p-6 text-white text-center">
+                    <h3 class="text-xl font-bold uppercase tracking-widest">Keputusan Semakan</h3>
+                </div>
+                
+                <div class="p-8 space-y-8">
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+                            <p class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">Nama Penuh</p>
+                            <p id="resNama" class="text-2xl font-bold theme-blue uppercase leading-tight">-</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-4 rounded-2xl">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Kelas</p>
+                                <p id="resKelas" class="text-lg font-bold">-</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-2xl">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">ID Delima</p>
+                                <p id="resID" class="text-sm font-mono font-bold">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col items-center py-6 bg-white border-2 border-dashed border-gray-100 rounded-3xl">
+                        <p class="text-xs font-bold text-gray-400 uppercase mb-4">Kod QR Kehadiran</p>
+                        <div id="qrDisplay" class="p-2 bg-white shadow-sm border rounded-xl"></div>
+                    </div>
+
+                    <button onclick="downloadSlip()" id="btnDownload" 
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 rounded-2xl flex justify-center items-center gap-3 transition-all shadow-lg text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        MUAT TURUN SLIP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- SLIP TEMPLATE (HIDDEN) -->
+    <div id="slip-container">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px; display: flex; flex-direction: column; align-items: center;">
+            <img src="https://i.postimg.cc/sghmP0WJ/logo-sekolah-kebangsaan-kulambai.png" style="height: 120px; width: auto;" crossorigin="anonymous">
+            <h2 style="font-size: 26px; font-weight: 800; color: #1a3a6e; margin-top: 15px; text-transform: uppercase;">Sekolah Kebangsaan Kulambai</h2>
+        </div>
+
+        <!-- Section 1 -->
+        <div style="border: 4px solid #2c5aa0; border-radius: 20px; padding: 25px; text-align: center; margin-bottom: 30px;">
+            <p id="slipNama" style="font-size: 28px; font-weight: 700; text-transform: uppercase; margin: 0; line-height: 1.2;"></p>
+            <p id="slipKelas" style="font-size: 32px; font-weight: 800; color: #2c5aa0; margin: 10px 0 0 0;"></p>
+        </div>
+
+        <!-- Section 2 -->
+        <div style="display: flex; gap: 15px; margin-bottom: 40px;">
+            <div style="flex: 1; background: #f1f5f9; padding: 20px; border-radius: 15px; text-align: center;">
+                <span style="font-size: 36px; display: block; margin-bottom: 5px;">📧</span>
+                <p style="font-size: 20px; font-weight: 600; color: #64748b; margin-bottom: 5px;">ID DELIMA</p>
+                <p id="slipID" style="font-size: 24px; font-weight: 700; color: #1e293b; word-break: break-all;"></p>
+            </div>
+            <div style="flex: 1; background: #f1f5f9; padding: 20px; border-radius: 15px; text-align: center;">
+                <span style="font-size: 36px; display: block; margin-bottom: 5px;">🔑</span>
+                <p style="font-size: 20px; font-weight: 600; color: #64748b; margin-bottom: 5px;">PASSWORD</p>
+                <p id="slipPass" style="font-size: 24px; font-weight: 700; color: #1e293b;"></p>
+            </div>
+        </div>
+
+        <!-- Section 3 -->
+        <div style="margin-top: auto; display: flex; align-items: center; gap: 25px; border-top: 3px dashed #cbd5e1; padding-top: 30px;">
+            <div style="flex: 1;">
+                <p style="font-size: 22px; font-weight: 800; color: #1a3a6e; margin-bottom: 10px;">QR KEHADIRAN</p>
+                <p style="font-size: 18px; color: #64748b; line-height: 1.4; margin: 0;">Sila imbas kod ini untuk tujuan perekodan kehadiran harian murid.</p>
+            </div>
+            <div id="slipQR" style="border: 5px solid #2c5aa0; padding: 10px; background: white; min-width: 354px; height: 354px; display: flex; align-items: center; justify-content: center;"></div>
+        </div>
+    </div>
+
+    <script>
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvsmmVem-XoTAmE9FAWUhJTV1eGrclfzl2f5II-HGNnRSpQeP_g4FXLIFuuqSkWHFq/exec";
+
+        async function searchStudent() {
+            const query = document.getElementById('inputNama').value.trim();
+            const btn = document.getElementById('btnSemak');
+            const notif = document.getElementById('statusNotif');
+            const area = document.getElementById('resultArea');
+
+            if (!query) {
+                showNotif("Sila masukkan nama penuh!", "bg-red-100 text-red-600");
+                return;
+            }
+
+            // UI Reset & Loading
+            btn.disabled = true;
+            btn.innerHTML = `<span class="loader"></span> <span>MENGHUBUNGI PELAYAN...</span>`;
+            notif.classList.add('hidden');
+            area.classList.add('hidden');
+
+            try {
+                // READ Data: GET method, cors mode
+                const response = await fetch(`${SCRIPT_URL}?nama=${encodeURIComponent(query)}`, {
+                    method: "GET",
+                    mode: "cors"
+                });
+
+                if (!response.ok) throw new Error();
+                const result = await response.json();
+
+                if (result.status === "success" || result.id_delima) {
+                    populateResult(result);
+                } else {
+                    showNotif("Maaf, maklumat tidak ditemui. Sila semak semula ejaan nama.", "bg-amber-100 text-amber-700");
+                }
+
+            } catch (err) {
+                console.error(err);
+                showNotif("Ralat sambungan. Sila cuba sekali lagi.", "bg-red-100 text-red-600");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span>SEMAK MAKLUMAT</span>`;
+            }
+        }
+
+        function populateResult(data) {
+            // Mapping keys (Handling case variations)
+            const n = data.nama || data.Nama || document.getElementById('inputNama').value;
+            const k = data.kelas || data.Kelas || "TIADA MAKLUMAT";
+            const id = data.id_delima || data.ID_Delima || "TIADA";
+            const p = data.password || data.Password || "TIADA";
+
+            // Web Display
+            document.getElementById('resNama').textContent = n;
+            document.getElementById('resKelas').textContent = k;
+            document.getElementById('resID').textContent = id;
+            document.getElementById('resPass').textContent = p;
+
+            const qrDisp = document.getElementById('qrDisplay');
+            qrDisp.innerHTML = "";
+            new QRCode(qrDisp, { text: n, width: 140, height: 140 });
+
+            // Slip Preparation
+            document.getElementById('slipNama').textContent = n;
+            document.getElementById('slipKelas').textContent = k;
+            document.getElementById('slipID').textContent = id;
+            document.getElementById('slipPass').textContent = p;
+            
+            const slipQr = document.getElementById('slipQR');
+            slipQr.innerHTML = "";
+            new QRCode(slipQr, { text: n, width: 354, height: 354 }); // Fixed 3cm size
+
+            document.getElementById('resultArea').classList.remove('hidden');
+        }
+
+        async function downloadSlip() {
+            const btn = document.getElementById('btnDownload');
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="loader"></span> <span>MENJANA PNG...</span>`;
+
+            try {
+                const canvas = await html2canvas(document.getElementById('slip-container'), {
+                    scale: 3, // High quality
+                    useCORS: true,
+                    backgroundColor: "#ffffff"
+                });
+
+                const link = document.createElement('a');
+                link.download = `SLIP_DELIMA_${document.getElementById('slipNama').textContent}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                alert("Gagal menjana imej. Sila hubungi admin.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        }
+
+        function showNotif(msg, style) {
+            const notif = document.getElementById('statusNotif');
+            notif.textContent = msg;
+            notif.className = `mt-6 p-4 rounded-2xl text-center font-bold ${style}`;
+            notif.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
